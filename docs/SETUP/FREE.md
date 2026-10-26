@@ -53,31 +53,22 @@ jobs:
     permissions:
       contents: read
     uses: <org>/github-workflows/.github/workflows/semgrep.yml@main
-  zizmor:
+  actions-security:
     permissions:
       contents: read
       pull-requests: read
-    uses: <org>/github-workflows/.github/workflows/zizmor.yml@main
-  ghalint:
+    uses: <org>/github-workflows/.github/workflows/actions-security.yml@main
+  style-check:
     permissions:
       contents: read
       pull-requests: read
-    uses: <org>/github-workflows/.github/workflows/ghalint.yml@main
-  actionlint:
-    permissions:
-      contents: read
-      pull-requests: read
-    uses: <org>/github-workflows/.github/workflows/actionlint.yml@main
-  tflint:
-    permissions:
-      contents: read
-      pull-requests: read
-    uses: <org>/github-workflows/.github/workflows/tflint.yml@main
+    uses: <org>/github-workflows/.github/workflows/style-check.yml@main
 ```
 
 - 呼び出し先は `@main` 参照のままにする（SHA 固定にすると中央の検知強化・修正に追従しなくなる）
 - コミット前検知(pre-commit)を運用しない場合は `pre-commit-check` の job を削除する
-- Terraform を使わないリポジトリでも `tflint` の job は削除しない（Terraform 関連ファイルに変更がなければ skip され success になる）
+- Terraform を使わないリポジトリでも `style-check` の job は削除しない（tflint は Terraform 関連ファイルに変更がなければ skip され success になる）
+- 旧構成の caller（`zizmor` / `ghalint` / `actionlint` / `tflint` の 4 job）を使っているリポジトリは、上記の `actions-security` / `style-check` の 2 job に置き換え、2.3 の `ghalint.yml` の excludes も更新する（旧ワークフローは削除済みのため、置き換えるまで caller が fail する）
 
 ### 2.3 zizmor / ghalint の許可設定を配置
 
@@ -110,13 +101,9 @@ excludes:
   - policy_name: action_ref_should_be_full_length_commit_sha
     action_name: <org>/github-workflows/.github/workflows/semgrep.yml
   - policy_name: action_ref_should_be_full_length_commit_sha
-    action_name: <org>/github-workflows/.github/workflows/zizmor.yml
+    action_name: <org>/github-workflows/.github/workflows/actions-security.yml
   - policy_name: action_ref_should_be_full_length_commit_sha
-    action_name: <org>/github-workflows/.github/workflows/ghalint.yml
-  - policy_name: action_ref_should_be_full_length_commit_sha
-    action_name: <org>/github-workflows/.github/workflows/actionlint.yml
-  - policy_name: action_ref_should_be_full_length_commit_sha
-    action_name: <org>/github-workflows/.github/workflows/tflint.yml
+    action_name: <org>/github-workflows/.github/workflows/style-check.yml
 ```
 
 ※ `action_name` はサブパス込みの完全一致のため、リポジトリ名だけの指定（`<org>/github-workflows`）では効かない
@@ -215,7 +202,7 @@ jobs:
               if ! grep -q "pull_request" "${target}"; then
                 problems+=("caller に \`pull_request\` トリガーがない")
               fi
-              for wf in gitleaks trivy semgrep zizmor ghalint actionlint tflint; do
+              for wf in gitleaks trivy semgrep actions-security style-check; do
                 if ! grep -Eq "uses:[[:space:]]*${ORG}/${CENTRAL}/\.github/workflows/${wf}\.yml@main" "${target}"; then
                   problems+=("caller が \`${wf}.yml@main\` を呼び出していない")
                 fi
@@ -358,7 +345,7 @@ excludes:
 
 - `AUDIT_APP_CLIENT_ID` が未設定の間、ワークフローは skip される（2.5.1 の配置が先行しても fail しない）
 - App に書き込み権限は付与しない（鍵漏洩時の影響を読み取りに限定する。配置・修復は人が PR で行う）
-- 監査内容: caller の存在と 7 ワークフローの `@main` 呼び出し・`pull_request` トリガー、`.github/zizmor.yml` / `ghalint.yml` の存在と必須設定、caller に pre-commit-check job がある場合は `.pre-commit-config.yaml`
+- 監査内容: caller の存在と 5 ワークフローの `@main` 呼び出し・`pull_request` トリガー、`.github/zizmor.yml` / `ghalint.yml` の存在と必須設定、caller に pre-commit-check job がある場合は `.pre-commit-config.yaml`
 
 ---
 ## 3. 📏 運用ルールを明文化して周知

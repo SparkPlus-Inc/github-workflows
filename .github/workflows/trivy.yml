@@ -5,6 +5,8 @@ name: "🛡️ Trivy スキャン"
 # fs / image の 2 種のスキャンを 1 ワークフローの別ジョブとして定義する。共通の起動ポリシー
 # （scanners / severity / ignore-unfixed / exit-code / DB フォールバック）は scan-fs 側で
 # YAML アンカー（&trivy-*）として単一定義し、scan-image はエイリアスで参照する。
+# image スキャン対象の決定も scan-fs 内で行う（課金はジョブ単位で 1 分に切り上げられるため、数秒で終わる処理を
+# 別ジョブにしない）。そのため scan-image は fs スキャンの完了後に開始する。
 #
 # Required workflow は対象 repo から inputs を受け取れないため、image スキャンは規約ベースで動作する:
 #   - 対象 repo にビルドマニフェスト（.github/trivy-image.yml）があればそれに従い、
@@ -43,6 +45,8 @@ jobs:
     timeout-minutes: 10  # Trivy DB ダウンロードの遅延でハングするのを防ぐ
     permissions:
       contents: read
+    outputs:
+      images: ${{ steps.detect.outputs.images }}
     steps:
       - name: "Checkout"
         uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0  # v7.0.0
@@ -110,21 +114,9 @@ jobs:
             trivy-fs.json
           retention-days: 30
 
-  detect:
-    name: "スキャン対象を決定"
-    runs-on: ubuntu-latest
-    timeout-minutes: 5
-    permissions:
-      contents: read
-    outputs:
-      images: ${{ steps.detect.outputs.images }}
-    steps:
-      - name: "Checkout"
-        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0  # v7.0.0
-        with:
-          persist-credentials: false
-
-      - name: "マニフェスト or 自動検出でスキャン対象を決定"
+      - name: "マニフェスト or 自動検出で image スキャン対象を決定"
+        # fs スキャンが fail しても scan-image に対象を渡せるよう実行する（job outputs として渡す）
+        if: ${{ !cancelled() }}
         id: detect
         shell: bash
         run: |
@@ -153,7 +145,7 @@ jobs:
                     suffix: ((.dockerfile + (if .target == "" then "" else "-\(.target)" end)) | gsub("[/.]"; "-"))
                   })'
             )
-            # マニフェストの記載ミスは build を待たず detect で分かりやすく落とす
+            # マニフェストの記載ミスは build を待たずここで分かりやすく落とす
             jq -e 'all(.[]; .dockerfile != "")' <<<"$images" >/dev/null \
               || { echo "::error::${manifest} の images[].dockerfile は必須です"; exit 1; }
             while IFS= read -r f; do
@@ -182,10 +174,12 @@ jobs:
 
   scan-image:
     name: "イメージをスキャン (${{ matrix.label }})"
-    needs: detect
-    # 0 件で空 matrix を渡すと job がエラーになるためここで skip する。
-    # detect が success していれば run 全体の結論は success となり、ルールセットの必須チェックを満たす
-    if: needs.detect.outputs.images != '[]'
+    needs: scan-fs
+    # fs スキャンで検出があっても（scan-fs が fail しても）image スキャンは実行する。
+    # 0 件で空 matrix を渡すと job がエラーになるためここで skip する。scan-fs が success していれば
+    # run 全体の結論は success となり、ルールセットの必須チェックを満たす。
+    # 対象の決定自体が失敗した場合（マニフェストの記載ミス等）は images が空になり skip されるが、scan-fs の fail で run は fail する
+    if: ${{ !cancelled() && needs.scan-fs.outputs.images != '' && needs.scan-fs.outputs.images != '[]' }}
     runs-on: ubuntu-latest
     timeout-minutes: 30  # docker build を含むため fs スキャンより長めに取る
     permissions:
@@ -193,7 +187,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        include: ${{ fromJSON(needs.detect.outputs.images) }}
+        include: ${{ fromJSON(needs.scan-fs.outputs.images) }}
     steps:
       - name: "Checkout"
         uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0  # v7.0.0

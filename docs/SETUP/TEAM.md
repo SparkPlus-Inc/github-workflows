@@ -153,11 +153,10 @@ Rules セクションで以下のチェックを外す:
 | Repository | Branch | Workflow |
 |:-----------|:-------|:---------|
 | `github-workflows` | `main` | `.github/workflows/trivy.yml` |
-| `github-workflows` | `main` | `.github/workflows/zizmor.yml` |
 | `github-workflows` | `main` | `.github/workflows/semgrep.yml` |
-| `github-workflows` | `main` | `.github/workflows/ghalint.yml` |
+| `github-workflows` | `main` | `.github/workflows/actions-security.yml` |
 
-※ `ghalint` は必須ワークフローのため全 PR で起動されるが、GitHub Actions 関連ファイル(`.github/workflows/` と ghalint の設定ファイル)に変更がない PR ではワークフロー内の判定で lint を skip し success になる。
+※ `actions-security` は ghalint(ポリシー違反)と zizmor(静的解析)を 1 ジョブで実行する(課金がジョブ単位で 1 分に切り上げられるため)。必須ワークフローのため全 PR で起動されるが、GitHub Actions 関連ファイル(`.github/workflows/`・`action.yml` と各ツールの設定ファイル)に変更がない PR ではワークフロー内の判定で skip し success になる。
 
 </details>
 
@@ -220,7 +219,7 @@ ghalint.yaml
 
 ※ `trivy.yaml`(リポジトリ直下)は Trivy が自動読込する設定ファイルで、`ignorefile` / `ignore-policy` により抑制先を差し替えられるため対象に含める。レビュー時はこの 2 項目が上記対象外のファイルを指していないかを確認する<br/>
 ※ `**/.semgrepignore` は Semgrepignore v2(Semgrep 1.117 以降のデフォルト)でサブディレクトリの `.semgrepignore` も有効になるため対象に含める<br/>
-※ zizmor の設定はワークフロー側(`.github/workflows/zizmor.yml` の `--config` / `--no-config`)で `.github/zizmor.yml` に固定しているため、自動探索され得る他パス(リポジトリ直下の `zizmor.yml` 等)の列挙は不要
+※ zizmor の設定はワークフロー側(`.github/workflows/actions-security.yml` の `--config` / `--no-config`)で `.github/zizmor.yml` に固定しているため、自動探索され得る他パス(リポジトリ直下の `zizmor.yml` 等)の列挙は不要
 
 </details>
 
@@ -292,11 +291,11 @@ Rules セクションで以下のチェックを外す:
 
 | Repository | Branch | Workflow |
 |:-----------|:-------|:---------|
-| `github-workflows` | `main` | `.github/workflows/actionlint.yml` |
-| `github-workflows` | `main` | `.github/workflows/tflint.yml` |
+| `github-workflows` | `main` | `.github/workflows/style-check.yml` |
 
-※ `actionlint` は必須ワークフローのため全 PR で起動されるが、ワークフロー関連ファイル(`.github/workflows/` と `.github/actionlint.yml`)に変更がない PR ではワークフロー内の判定で lint を skip し success になる。<br/>
-※ `tflint` も同様に全 PR で起動されるが、Terraform 関連ファイル(`*.tf` / `*.tfvars` / `.tflint.hcl` 等)に変更がない PR では lint を skip し success になる(Terraform 未使用のリポジトリでも合格する)。設定は「実行ディレクトリ自身の `.tflint.hcl` > リポジトリ直下の `.tflint.hcl`」の優先で適用され、どちらも無ければ組み込み terraform ruleset の recommended プリセットで lint される。
+※ `style-check` は actionlint と tflint を 1 ジョブで実行する(課金がジョブ単位で 1 分に切り上げられるため)。必須ワークフローのため全 PR で起動されるが、lint ごとに対象ファイルの変更を判定し、変更がなければ skip して success になる。<br/>
+※ actionlint の対象はワークフロー関連ファイル(`.github/workflows/` と `.github/actionlint.yml`)。<br/>
+※ tflint の対象は Terraform 関連ファイル(`*.tf` / `*.tfvars` / `.tflint.hcl` 等)で、Terraform 未使用のリポジトリでも合格する。設定は「実行ディレクトリ自身の `.tflint.hcl` > リポジトリ直下の `.tflint.hcl`」の優先で適用され、どちらも無ければ組み込み terraform ruleset の recommended プリセットで lint される。
 
 </details>
 
