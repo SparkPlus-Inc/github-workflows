@@ -113,10 +113,11 @@ jobs:
           retention-days: 30
 
       - name: "スキャン結果を判定"
-        # 【一時対応】Trivy の DNS 障害で、Trivy の取得や DB のダウンロードに失敗してもマージできるようにする。
+        # 【一時対応】DNS 障害で Trivy をインストールできなくても、マージできるようにする。
         # 障害が復旧したら、この step と Trivy step の continue-on-error を削除する
-        #   - 結果 (JSON) がある = スキャンは完了し、検知があった → 従来どおり fail
-        #   - 結果 (JSON) が無い = Trivy 自体が動かなかった → warning を出して success にする
+        #   - 結果 (JSON) がある = 検知あり → 従来どおり fail
+        #   - Trivy は入ったが結果が無い → fail (対象 repo の trivy.yaml 等でわざと落とせるため skip しない)
+        #   - Trivy が入っていない = インストールに失敗した → warning を出して success にする
         if: steps.trivy.outcome == 'failure'
         shell: bash
         run: |
@@ -125,7 +126,11 @@ jobs:
             echo "::error::Trivy が脆弱性 / 設定ミスを検知しました。「スキャン結果を log と annotation に表示」を確認してください"
             exit 1
           fi
-          msg="Trivy が動かなかったため、スキャンを skip しました (Trivy の DNS 障害への一時対応)。障害の復旧後に再実行してください"
+          if command -v trivy >/dev/null 2>&1; then
+            echo "::error::Trivy は起動しましたが、結果を出せずに失敗しました。「Trivy fs スキャン」のログを確認してください"
+            exit 1
+          fi
+          msg="Trivy をインストールできなかったため、スキャンを skip しました (DNS 障害への一時対応)。障害の復旧後に再実行してください"
           echo "::warning::${msg}"
           echo "⚠️ ${msg}" >> "$GITHUB_STEP_SUMMARY"
 
@@ -288,10 +293,11 @@ jobs:
           retention-days: 30
 
       - name: "スキャン結果を判定"
-        # 【一時対応】Trivy の DNS 障害で、Trivy の取得や DB のダウンロードに失敗してもマージできるようにする。
+        # 【一時対応】DNS 障害で Trivy をインストールできなくても、マージできるようにする。
         # 障害が復旧したら、この step と Trivy step の continue-on-error を削除する
-        #   - 結果 (JSON) がある = スキャンは完了し、検知があった → 従来どおり fail
-        #   - 結果 (JSON) が無い = Trivy 自体が動かなかった → warning を出して success にする
+        #   - 結果 (JSON) がある = 検知あり → 従来どおり fail
+        #   - Trivy は入ったが結果が無い → fail (対象 repo の trivy.yaml 等でわざと落とせるため skip しない)
+        #   - Trivy が入っていない = インストールに失敗した → warning を出して success にする
         if: steps.trivy.outcome == 'failure'
         shell: bash
         run: |
@@ -300,6 +306,10 @@ jobs:
             echo "::error::Trivy が脆弱性 / 設定ミスを検知しました。「スキャン結果を log と annotation に表示」を確認してください"
             exit 1
           fi
-          msg="Trivy が動かなかったため、スキャンを skip しました (Trivy の DNS 障害への一時対応)。障害の復旧後に再実行してください"
+          if command -v trivy >/dev/null 2>&1; then
+            echo "::error::Trivy は起動しましたが、結果を出せずに失敗しました。「Trivy image スキャン」のログを確認してください"
+            exit 1
+          fi
+          msg="Trivy をインストールできなかったため、スキャンを skip しました (DNS 障害への一時対応)。障害の復旧後に再実行してください"
           echo "::warning::${msg}"
           echo "⚠️ ${msg}" >> "$GITHUB_STEP_SUMMARY"
