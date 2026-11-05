@@ -413,6 +413,6 @@ renovatebot/github-action@*
 
 > 依存関係のアップデート PR は、`renovate-config` リポジトリのセルフホスト型 Renovate ランナーが毎日起票する
 
-セットアップ手順(GitHub App の作成・シークレットの登録)と運用方法は `renovate-config` リポジトリの `SETUP.md` / `README.md` を参照。
+セットアップ手順(GitHub App の作成・シークレットの登録)と運用方法は `renovate-config` リポジトリの `README.md` を参照。
 
 ※ ランナーの実行ログには autodiscover した Org 全リポジトリ名(private 含む)が出力されるため、ランナーは本リポジトリではなく private の `renovate-config` に置いて運用する。
